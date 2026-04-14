@@ -174,7 +174,7 @@ class Handler extends ExceptionHandler
      * @param  \Exception  $e
      * @return bool
      */
-    protected function isHttpXpressengineException(Exception $e = null)
+    protected function isHttpXpressengineException(?Exception $e = null)
     {
         return $e !== null && $e instanceof HttpXpressengineException;
     }

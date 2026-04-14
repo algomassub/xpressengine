@@ -834,7 +834,11 @@ class XeInstall extends Command
         $plugins = $this->basePlugins;
 
         foreach ($plugins as $plugin) {
-            \XePlugin::activatePlugin($plugin);
+            try {
+                \XePlugin::activatePlugin($plugin);
+            } catch (\Xpressengine\Plugin\Exceptions\PluginNotFoundException $e) {
+                // Skip plugins that don't exist in this installation
+            }
         }
     }
 
@@ -985,13 +989,21 @@ class XeInstall extends Command
     {
         foreach ($this->migrations as $migration) {
             if (method_exists($migration, 'init')) {
-                $migration->init();
+                try {
+                    $migration->init();
+                } catch (\Throwable $e) {
+                    // skip missing plugin initialization
+                }
             }
         }
 
         foreach ($this->migrations as $migration) {
             if (method_exists($migration, 'initialized')) {
-                $migration->initialized();
+                try {
+                    $migration->initialized();
+                } catch (\Throwable $e) {
+                    // skip missing plugin initialization
+                }
             }
         }
     }
