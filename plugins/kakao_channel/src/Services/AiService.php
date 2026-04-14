@@ -39,6 +39,18 @@ class AiService
     {
         $provider = $this->config['ai_provider'] ?? 'openai';
 
+        // API 키 미설정 시 안내 메시지 반환
+        if ($provider === 'claude') {
+            $apiKey = $this->config['claude_api_key'] ?? '';
+        } else {
+            $apiKey = $this->config['openai_api_key'] ?? '';
+        }
+
+        if (empty(trim($apiKey))) {
+            \Log::warning('KakaoChannel AiService: API 키가 설정되지 않았습니다.', ['provider' => $provider]);
+            return '관리자 설정에서 AI API 키를 입력해 주세요. (설정 > 카카오채널 AI)';
+        }
+
         try {
             if ($provider === 'claude') {
                 return $this->callClaude($utterance, $history);

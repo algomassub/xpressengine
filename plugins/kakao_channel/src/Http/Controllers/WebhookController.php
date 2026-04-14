@@ -40,44 +40,68 @@ class WebhookController
      */
     public function handle(Request $request): JsonResponse
     {
-        // 카카오 요청 파싱
-        $userKey   = $request->input('userRequest.user.id', '');
-        $botId     = $request->input('bot.id', 'default');
-        $utterance = trim((string) $request->input('userRequest.utterance', ''));
+        try {
+            // 카카오 요청 파싱 (JSON body 또는 form data 모두 지원)
+            $body      = $request->isJson() ? $request->json()->all() : $request->all();
+            $userKey   = data_get($body, 'userRequest.user.id', '');
+            $botId     = data_get($body, 'bot.id', 'default');
+            $utterance = trim((string) data_get($body, 'userRequest.utterance', ''));
 
-        // 빈 메시지 처리
-        if (empty($utterance)) {
-            return $this->makeKakaoResponse('안녕하세요! 무엇을 도와드릴까요?');
-        }
-
-        // 대화 초기화 명령어 처리
-        if (in_array($utterance, ['대화초기화', '처음부터', '/reset'], true)) {
-            if ($userKey && $botId) {
-                (new ConversationService($this->getMaxHistory()))->clearHistory($userKey, $botId);
+            // 빈 메시지 처리
+            if (empty($utterance)) {
+                return $this->makeKakaoResponse('안녕하세요! 무엇을 도와드릴까요?');
             }
-            return $this->makeKakaoResponse('대화 이력이 초기화되었습니다. 새로운 대화를 시작해 주세요!');
+
+            // 대화 초기화 명령어 처리
+            if (in_array($utterance, ['대화초기화', '처음부터', '/reset'], true)) {
+                if ($userKey && $botId) {
+                    try {
+                        (new ConversationService($this->getMaxHistory()))->clearHistory($userKey, $botId);
+                    } catch (\Exception $e) {
+                        \Log::warning('KakaoChannel clearHistory 오류: ' . $e->getMessage());
+                    }
+                }
+                return $this->makeKakaoResponse('대화 이력이 초기화되었습니다. 새로운 대화를 시작해 주세요!');
+            }
+
+            $config = $this->getConfig();
+
+            // 1. 대화 이력 조회 (DB 오류 시 빈 배열로 처리)
+            $conversationService = new ConversationService(
+                (int) ($config['max_history'] ?? 10)
+            );
+            $history = [];
+            if ($userKey && $botId) {
+                try {
+                    $history = $conversationService->getHistory($userKey, $botId);
+                } catch (\Exception $e) {
+                    \Log::warning('KakaoChannel getHistory 오류: ' . $e->getMessage());
+                }
+            }
+
+            // 2. AI 답변 생성
+            $aiReply = (new AiService($config))->generateReply($utterance, $history);
+
+            // 3. 대화 이력 저장 (DB 오류 시 무시)
+            if ($userKey && $botId) {
+                try {
+                    $conversationService->addMessages($userKey, $botId, $utterance, $aiReply);
+                } catch (\Exception $e) {
+                    \Log::warning('KakaoChannel addMessages 오류: ' . $e->getMessage());
+                }
+            }
+
+            // 4. 카카오 응답 포맷으로 반환
+            return $this->makeKakaoResponse($aiReply);
+
+        } catch (\Exception $e) {
+            \Log::error('KakaoChannel Webhook 치명적 오류: ' . $e->getMessage(), [
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->makeKakaoResponse('죄송합니다. 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
         }
-
-        $config = $this->getConfig();
-
-        // 1. 대화 이력 조회
-        $conversationService = new ConversationService(
-            (int) ($config['max_history'] ?? 10)
-        );
-        $history = ($userKey && $botId)
-            ? $conversationService->getHistory($userKey, $botId)
-            : [];
-
-        // 2. AI 답변 생성
-        $aiReply = (new AiService($config))->generateReply($utterance, $history);
-
-        // 3. 대화 이력 저장
-        if ($userKey && $botId) {
-            $conversationService->addMessages($userKey, $botId, $utterance, $aiReply);
-        }
-
-        // 4. 카카오 응답 포맷으로 반환
-        return $this->makeKakaoResponse($aiReply);
     }
 
     /**
