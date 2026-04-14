@@ -1,0 +1,23 @@
+{
+    "name": "xpressengine-plugin/kakao_channel",
+    "description": "카카오채널 AI 자동답변 플러그인 (카카오 i 오픈빌더 스킬 서버)",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "xpressengine/xpressengine": "3.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "KakaoChannel\\": "src/"
+        }
+    },
+    "extra": {
+        "xpressengine": {
+            "plugins": {
+                "kakao_channel": {
+                    "class": "KakaoChannel\\Plugin"
+                }
+            }
+        }
+    }
+}
