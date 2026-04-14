@@ -36,6 +36,9 @@ services:
         condition: service_healthy
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   # Nginx 웹서버
   nginx:
