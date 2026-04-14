@@ -140,8 +140,16 @@ class MenuMigration extends Migration
         $this->setThemeConfig($mainMenu->id);
 
         //for together
-        $this->widgetPageModuleMenuSetup($mainMenu);
-        $this->boardModuleMenuSetup($mainMenu);
+        try {
+            $this->widgetPageModuleMenuSetup($mainMenu);
+        } catch (\Xpressengine\Menu\Exceptions\NotFoundModuleException $e) {
+            // widget_page plugin not available, skip
+        }
+        try {
+            $this->boardModuleMenuSetup($mainMenu);
+        } catch (\Xpressengine\Menu\Exceptions\NotFoundModuleException $e) {
+            // board plugin not available, skip
+        }
     }
 
     /**
